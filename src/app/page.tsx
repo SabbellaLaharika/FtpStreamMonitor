@@ -1,65 +1,142 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+import { socket } from "@/lib/socket-client";
+import { FtpFile, SnapshotDiff } from "@/types/ftp";
+import { FileTree } from "@/components/FileTree";
+import { ActivityFeed, ActivityEntry } from "@/components/ActivityFeed";
+import { FilePreview } from "@/components/FilePreview";
+
+export default function Dashboard() {
+  const [files, setFiles] = useState<FtpFile[]>([]);
+  const [activities, setActivities] = useState<ActivityEntry[]>([]);
+  const [selectedFile, setSelectedFile] = useState<FtpFile | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [pollingInterval, setPollingInterval] = useState<number>(5000);
+
+  useEffect(() => {
+    // Initial fetch of current config
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(data => setPollingInterval(data.pollingIntervalMs))
+      .catch(err => console.error('Failed to fetch config', err));
+
+    socket.on("connect", () => {
+      setConnected(true);
+      console.log("Connected to WebSocket");
+    });
+
+    socket.on("disconnect", () => {
+      setConnected(false);
+      console.log("Disconnected from WebSocket");
+    });
+
+    socket.on("fs:snapshot", (data: { snapshot: FtpFile[] }) => {
+      console.log("Received snapshot", data.snapshot);
+      setFiles(data.snapshot);
+    });
+
+    socket.on("fs:diff", (diff: SnapshotDiff) => {
+      console.log("Received diff", diff);
+      
+      const newActivities: ActivityEntry[] = [];
+      const timestamp = new Date().toISOString();
+
+      setFiles(prev => {
+        let current = [...prev];
+
+        // Handle deletions
+        diff.deleted.forEach(file => {
+          current = current.filter(f => f.path !== file.path);
+          newActivities.push({ type: 'deleted', file, timestamp });
+        });
+
+        // Handle additions
+        diff.added.forEach(file => {
+          if (!current.find(f => f.path === file.path)) {
+            current.push(file);
+          }
+          newActivities.push({ type: 'added', file, timestamp });
+        });
+
+        // Handle modifications
+        diff.modified.forEach(file => {
+          current = current.map(f => f.path === file.path ? file : f);
+          newActivities.push({ type: 'modified', file, timestamp });
+        });
+
+        return current;
+      });
+
+      setActivities(prev => [newActivities[0], ...prev].slice(0, 50)); // Keep last 50
+    });
+
+    return () => {
+      socket.off("connect");
+      socket.off("disconnect");
+      socket.off("fs:snapshot");
+      socket.off("fs:diff");
+    };
+  }, []);
+
+  const handleUpdateInterval = async (val: string) => {
+    const num = parseInt(val);
+    if (isNaN(num)) return;
+    
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pollingIntervalMs: num })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPollingInterval(data.pollingIntervalMs);
+      }
+    } catch (err) {
+      console.error('Failed to update interval', err);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-gray-100 p-8 font-sans">
+      <header className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">FTP Stream Monitor</h1>
+          <div className="flex items-center mt-2">
+            <span className={`inline-block w-3 h-3 rounded-full mr-2 ${connected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+            <span className="text-sm text-gray-600 font-medium">{connected ? 'Live' : 'Disconnected'}</span>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center space-x-4">
+          <label className="text-sm font-semibold text-gray-700">Polling Interval (ms):</label>
+          <input 
+            type="number" 
+            value={pollingInterval}
+            onChange={(e) => setPollingInterval(parseInt(e.target.value))}
+            onBlur={(e) => handleUpdateInterval(e.target.value)}
+            className="w-24 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
-      </main>
+      </header>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Left Sidebar: File Tree */}
+        <div className="lg:col-span-3">
+          <FileTree files={files} onFileClick={setSelectedFile} />
+        </div>
+
+        {/* Center: Preview */}
+        <div className="lg:col-span-6 h-[600px]">
+          <FilePreview file={selectedFile} />
+        </div>
+
+        {/* Right: Activity Feed */}
+        <div className="lg:col-span-3">
+          <ActivityFeed activities={activities} />
+        </div>
+      </div>
     </div>
   );
 }
