@@ -1,25 +1,21 @@
 FROM node:20-alpine AS base
 
-# Install dependencies only when needed
+# 1. Install dependencies only when needed
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# Rebuild the source code only when needed
+# 2. Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Environment variables must be present at build time if needed by Next.js
 ENV NEXT_TELEMETRY_DISABLED 1
-
 RUN npm run build
 
-# Production image, copy all the files and run next
+# 3. Production image, copy only necessary files
 FROM base AS runner
 WORKDIR /app
 
@@ -29,22 +25,24 @@ ENV NEXT_TELEMETRY_DISABLED 1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Copy built assets and source for custom server
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/package.json /app/package-lock.json* ./
 COPY --from=builder /app/server.ts ./server.ts
 COPY --from=builder /app/src ./src
 
-# Set the correct permission for Next.js folder
-RUN chown -R nextjs:nodejs .next
+# Install ONLY production dependencies
+RUN npm ci --omit=dev && npm cache clean --force
+
+# Set permissions
+RUN chown -R nextjs:nodejs . && \
+    chmod -R 755 .
 
 USER nextjs
 
 EXPOSE 3000
-
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-# Use the custom server.ts for Socket.IO support
 CMD ["npm", "run", "start"]

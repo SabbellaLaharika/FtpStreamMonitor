@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.env
+*.test.ts
+tests
+socket-test.ts
+ftp-data
+README.md
+docker-compose.yml
+Dockerfile

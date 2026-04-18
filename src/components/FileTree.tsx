@@ -12,18 +12,18 @@ interface FileTreeProps {
 export const FileTree: React.FC<FileTreeProps> = ({ files, onFileClick }) => {
   // Convert flat list to hierarchy
   const buildTree = (files: FtpFile[]) => {
-    const root: any = {};
+    const root: any = { _file: null, _children: {} };
     files.forEach(file => {
       const parts = file.path.split('/').filter(p => p);
       let current = root;
       parts.forEach((part, index) => {
-        if (!current[part]) {
-          current[part] = {
+        if (!current._children[part]) {
+          current._children[part] = {
             _file: index === parts.length - 1 ? file : null,
             _children: {}
           };
         }
-        current = current[part]._children;
+        current = current._children[part];
       });
     });
     return root;

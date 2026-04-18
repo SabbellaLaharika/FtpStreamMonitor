@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       contentType = mimeTypes[ext];
     }
 
-    return new NextResponse(buffer, {
+    return new NextResponse(buffer as any, {
       status: 200,
       headers: {
         'Content-Type': contentType,
