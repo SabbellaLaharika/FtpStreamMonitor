@@ -13,7 +13,7 @@ services:
       ftp:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r => r.ok ? r.json() : Promise.reject()).then(d => { if (d.status === 'ok' && d.ftpConnection === 'connected') process.exit(0); else process.exit(1); }).catch(() => process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 5

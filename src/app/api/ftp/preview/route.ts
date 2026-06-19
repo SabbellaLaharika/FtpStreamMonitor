@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('API preview error:', error);
-    if (error.code === 550) {
+    if (error.code === 550 || error.code === '550' || String(error.message).includes('550')) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 });
     }
     return NextResponse.json({ error: 'Failed to preview file' }, { status: 500 });

@@ -16,29 +16,46 @@ interface ActivityFeedProps {
 
 export const ActivityFeed: React.FC<ActivityFeedProps> = ({ activities }) => {
   return (
-    <div className="bg-gray-50 p-4 rounded shadow border border-gray-200" data-test-id="activity-feed">
-      <h2 className="text-xl font-bold mb-4">Activity Feed</h2>
-      <div className="space-y-2 overflow-y-auto max-h-[400px]">
-        {activities.length === 0 && <p className="text-gray-500 italic">No activity detected yet.</p>}
+    <div className="bg-slate-900/40 backdrop-blur-md p-4 rounded-xl border border-slate-800/80 flex flex-col h-full min-h-[400px]" data-test-id="activity-feed">
+      <h2 className="text-md font-bold text-slate-100 mb-3 flex items-center gap-2">
+        <span>⚡</span> Live Activity
+      </h2>
+      <div className="space-y-2.5 overflow-y-auto flex-grow pr-1 max-h-[500px]">
+        {activities.length === 0 && (
+          <div className="text-slate-500 text-xs italic p-4 text-center">
+            No filesystem activity detected yet.
+          </div>
+        )}
         {activities.map((activity, index) => (
           <div 
             key={`${activity.timestamp}-${index}`}
-            className={`p-3 rounded border-l-4 ${
-              activity.type === 'added' ? 'bg-green-50 border-green-500' :
-              activity.type === 'modified' ? 'bg-yellow-50 border-yellow-500' :
-              'bg-red-50 border-red-500'
+            className={`p-3 rounded-lg border transition-all duration-150 ${
+              activity.type === 'added' ? 'bg-emerald-950/20 border-emerald-900/50 text-emerald-400' :
+              activity.type === 'modified' ? 'bg-amber-950/20 border-amber-900/50 text-amber-400' :
+              'bg-rose-950/20 border-rose-900/50 text-rose-400'
             }`}
             data-test-id={`activity-item-${activity.type}-${encodePath(activity.file.path)}`}
           >
-            <div className="flex justify-between items-start">
-              <span className="font-semibold capitalize text-gray-700">{activity.type}</span>
-              <span className="text-xs text-gray-400">{new Date(activity.timestamp).toLocaleTimeString()}</span>
+            <div className="flex justify-between items-start gap-2">
+              <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
+                activity.type === 'added' ? 'bg-emerald-500/10 text-emerald-300' :
+                activity.type === 'modified' ? 'bg-amber-500/10 text-amber-300' :
+                'bg-rose-500/10 text-rose-300'
+              }`}>
+                {activity.type}
+              </span>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {new Date(activity.timestamp).toLocaleTimeString()}
+              </span>
             </div>
-            <div className="text-sm truncate font-mono mt-1" title={activity.file.path}>
+            
+            <div className="text-xs truncate font-mono mt-2 text-slate-300" title={activity.file.path}>
               {activity.file.path}
             </div>
-            <div className="text-xs text-gray-500 mt-1">
-              Size: {activity.file.size} bytes
+            
+            <div className="flex justify-between items-center text-[10px] text-slate-500 mt-1.5 font-mono">
+              <span>Size: {activity.file.size} B</span>
+              <span>{activity.file.type}</span>
             </div>
           </div>
         ))}

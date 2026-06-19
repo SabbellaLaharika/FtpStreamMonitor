@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# portfolio assets
+ftp_stream_monitor_*.png
+
+# local testing data
+ftp-data/
