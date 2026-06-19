@@ -1,18 +1,29 @@
 # FTP Stream Monitor (Real-Time State Synchronization)
 
-A real-time, event-driven system monitoring application that wraps a stateless FTP server, detects filesystem modifications using an in-memory diffing engine, and streams live updates to connected browser dashboards using WebSockets.
+An event-driven filesystem audit monitor (similar to Dropbox sync-daemons or cloud log aggregators) that wraps a stateless FTP server, detects filesystem modifications in memory, and streams live updates to a browser dashboard via WebSockets.
 
 ---
 
-## 🚀 Overview
+## 🛠️ Overview & Tech Stack
 
-This project implements a highly auditable and low-latency system monitor where:
--   **FTP File State** is evaluated dynamically via recursive directory listing.
--   **State Differences (Diffs)** are calculated in memory to bypass database write bottlenecks.
--   **Symmetric Diffing** detects additions, modifications, and deletions in linear O(N) time.
--   **WebSockets (Socket.io)** broadcast incremental patches to all client web UIs.
+This application implements a highly auditable and low-latency system monitor based on the following principles:
+-   **FTP File State**: Evaluated dynamically via recursive directory listing.
+-   **In-Memory Comparison**: State differences (diffs) are calculated in memory to bypass database write locks and network file-transfer bottlenecks.
+-   **Symmetric Diffing**: Detects additions, modifications, and deletions in linear O(N) time.
+-   **WebSockets**: Broadcasts incremental patches with sub-millisecond network latency.
 
----
+### 💻 Frontend Tier
+*   **Next.js 16 (App Router)**: Serves as the core React framework, leveraging Server-Side Rendering (SSR) for fast initial loads and optimized client components for real-time interactivity.
+*   **React 19**: Manages the local UI state tree, dynamically re-rendering the Explorer tree, stats panels, and activity cards with surgical efficiency when WebSocket events are received.
+
+### ⚙️ Backend Tier
+*   **Custom Node.js Server (`tsx` execution)**: Integrates Socket.io directly with the Next.js request handler, bypassing serverless route limitations to support permanent, low-overhead WebSocket tunnels.
+*   **Socket.io**: Establishes persistent bidirectional connections, broadcasting filesystem delta events (`fs:diff`) to all active client tabs.
+*   **basic-ftp Client**: Wraps standard FTP commands in promise-based streams, supporting automated directory navigation, folder creation, and Extended Passive Mode (EPSV).
+
+### 🐳 Infrastructure & DevOps
+*   **Docker & Docker Compose**: Orchestrates the multi-container stack, building a multi-stage production image for the Next.js app and deploying a containerized `vsftpd` server in an isolated bridge network.
+*   **Jest & ts-jest**: Executes typing-safe unit tests verifying the O(N) symmetric diffing algorithm across all target directory modification scenarios.
 
 ## 🏗️ High-Level Architecture & Flow
 
@@ -20,29 +31,34 @@ The system consists of three primary tiers: the web client dashboard, the Next.j
 
 ```mermaid
 graph TD
-    Client[Web Dashboard Client] <-->|WebSockets: Socket.io| Server[Next.js App & Socket.io Server]
-    Server <-->|FTP Protocol| FTPServer[vsftpd FTP Server]
-    
-    subgraph Client Application
+    subgraph Client [Browser Dashboard]
         Tree[File Tree Component]
-        Feed[Activity Feed]
+        Feed[Activity Feed Component]
         Preview[File Preview Panel]
     end
     
-    subgraph Backend Services
-        Poll[Polling Service]
+    subgraph Server [Next.js & Socket.io Server]
+        API[API Router]
+        WS[Socket.io Hub]
+        Poll[Polling coordinator]
         Diff[Diff Engine]
-        FTPWrapper[basic-ftp Client]
     end
     
-    Client -->|GET /api/ftp/preview| Server
-    Client -->|GET/POST /api/config| Server
+    FTPServer[(vsftpd FTP Server)]
     
-    Poll -->|Run Interval| FTPWrapper
-    FTPWrapper -->|Recursive List| FTPServer
-    FTPWrapper -->|Returns Directory Snapshot| Poll
-    Poll -->|Compare Snapshots| Diff
-    Diff -->|Emit SnapshotDiff| Server
+    %% Client Interactions
+    Tree -->|User Click| Preview
+    Preview -->|HTTP GET /api/ftp/preview| API
+    
+    %% Socket Connections
+    WS <-->|WebSockets| Tree
+    WS -.->|fs:diff| Feed
+    
+    %% Backend Flow
+    Poll -->|1. Poll Interval| FTPServer
+    FTPServer -->|2. Directory List| Poll
+    Poll -->|3. Compare snapshot| Diff
+    Diff -->|4. Emit Diff| WS
 ```
 
 ---
