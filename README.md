@@ -6,7 +6,7 @@ An event-driven filesystem audit monitor (similar to Dropbox sync-daemons or clo
 
 ## 🎥 Project Demo
 
-[![Watch the FTP Stream Monitor demo on YouTube](https://img.youtube.com/vi/DGp8L3YB6Uk/hqdefault.jpg)](https://youtu.be/DGp8L3YB6Uk)
+[![Watch the FTP Stream Monitor demo on YouTube](https://img.youtube.com/vi/DGp8L3YB6Uk/maxresdefault.jpg)](https://youtu.be/DGp8L3YB6Uk)
 
 ---
 
